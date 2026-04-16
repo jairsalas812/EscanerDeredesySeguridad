@@ -149,16 +149,11 @@ wifi-scanner/
 │
 ├── wifi_scanner.ino        # Punto de entrada — lógica principal del sistema
 │
-├── src/                    # Módulos separados para escalabilidad futura
-│   ├── display.h/.cpp      # Funciones de visualización TFT
-│   ├── scanner.h/.cpp      # Lógica de escaneo Wi-Fi
-│   └── utils.h/.cpp        # Funciones auxiliares (colores, texto)
-│
-├── lib/                    # Librerías externas fijadas por versión
-├── include/                # Archivos de cabecera globales
 │
 ├── docs/                   # Documentación técnica y diagramas
-│   └── arquitectura.png
+│    └── DiagramaEsquematico.png
+│    └── DiagramaPictorico.png
+│    └── Diagramadebloques.png 
 │
 ├── assets/                 # Capturas e imágenes del dispositivo físico
 │
