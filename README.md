@@ -1,64 +1,120 @@
 # 📡 Escáner de Redes y Seguridad Wi-Fi
 
-> Dispositivo portátil basado en ESP32 para el análisis en tiempo real del entorno inalámbrico. Detecta redes Wi-Fi cercanas, evalúa la intensidad de señal y muestra los resultados en una pantalla TFT sin necesidad de software externo.
+> Dispositivo portátil basado en **ESP32** que analiza el entorno inalámbrico en tiempo real. Detecta redes Wi-Fi cercanas, evalúa la intensidad de señal y muestra los resultados en una pantalla TFT, sin necesidad de computadora ni software externo.
 
 ---
 
 ## 📋 Tabla de contenido
 
-- [¿Qué hace el proyecto?](#-qué-hace-el-proyecto)
+- [Descripción del proyecto](#-descripción-del-proyecto)
 - [Arquitectura del sistema](#-arquitectura-del-sistema)
+- [Diagrama de secuencia](#-diagrama-de-secuencia)
 - [Tecnologías utilizadas](#-tecnologías-utilizadas)
-- [Estructura de carpetas](#-estructura-de-carpetas)
-- [Requisitos previos](#-requisitos-previos)
-- [Instalación y configuración](#-instalación-y-configuración)
-- [Uso](#-uso)
-- [Pruebas](#-pruebas)
-- [Contribuir](#-contribuir)
+- [Estructura del proyecto](#-estructura-del-proyecto)
+- [Requisitos e instalación](#-requisitos-e-instalación)
+- [Cómo usarlo](#-cómo-usarlo)
+- [Cómo correr tests](#-cómo-correr-tests)
+- [FAQ — Dudas frecuentes](#-faq--dudas-frecuentes)
+- [Cómo contribuir](#-cómo-contribuir)
 
 ---
 
-## 🔍 ¿Qué hace el proyecto?
+## 📖 Descripción del proyecto
 
-El **Escáner de Redes y Seguridad Wi-Fi** es una herramienta de diagnóstico portátil que permite:
+El **Escáner de Redes y Seguridad Wi-Fi** es una herramienta de diagnóstico portátil orientada a usuarios que necesitan visibilidad sobre el entorno inalámbrico que los rodea. En muchos contextos —hogares, oficinas o espacios públicos— las personas desconocen cuántas redes existen cerca, cuáles están saturadas o si hay dispositivos desconocidos que representen un riesgo.
 
-- **Detectar** todas las redes Wi-Fi disponibles en el entorno
-- **Visualizar** nombre de red (SSID), canal y intensidad de señal (RSSI) en pantalla TFT
-- **Identificar** posibles congestiones, interferencias o dispositivos desconocidos
-- **Operar** de forma autónoma sin computadora ni software especializado
+### ¿Para qué sirve?
 
-> ⚠️ El dispositivo realiza **análisis pasivo** únicamente. No interviene, vulnera ni ataca redes. Solo observa y muestra información del espectro Wi-Fi.
+- Detectar todas las redes Wi-Fi disponibles en el área
+- Visualizar SSID, canal y nivel de señal (RSSI) en pantalla TFT
+- Identificar congestión de canales o interferencias
+- Operar de forma autónoma sin necesidad de computadora
+
+### ¿Qué NO hace?
+
+> ⚠️ El dispositivo realiza **análisis pasivo** únicamente. No intercepta tráfico, no vulnera redes ni realiza ningún tipo de ataque. Solo observa y muestra información pública del espectro Wi-Fi.
 
 ---
 
 ## 🏗️ Arquitectura del sistema
 
-El sistema se organiza en tres capas:
+El sistema sigue una arquitectura de **tres capas** alojadas en un único microcontrolador ESP32:
 
 ```
-┌─────────────────────────────────────────────┐
-│           VISUALIZACIÓN                     │
-│         Pantalla TFT ILI9341                │
-│     (SPI → tabla, colores, animación)       │
-├─────────────────────────────────────────────┤
-│           PROCESAMIENTO                     │
-│               ESP32                         │
-│  (lógica, filtrado, colores por RSSI,       │
-│   recorte de texto, organización de datos)  │
-├─────────────────────────────────────────────┤
-│        ADQUISICIÓN DE DATOS                 │
-│       Módulo Wi-Fi interno ESP32            │
-│    (WiFi.scanNetworks → SSID, canal, RSSI)  │
-└─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│                   VISUALIZACIÓN                      │
+│              Pantalla TFT ILI9341 (2.4")             │
+│        Protocolo SPI · Adafruit_GFX · colores        │
+├──────────────────────────────────────────────────────┤
+│                  PROCESAMIENTO                       │
+│                      ESP32                           │
+│   Lógica principal · filtrado · colores por RSSI     │
+│   recorte de texto · organización de tabla visual    │
+├──────────────────────────────────────────────────────┤
+│              ADQUISICIÓN DE DATOS                    │
+│          Módulo Wi-Fi interno del ESP32              │
+│       WiFi.scanNetworks() → SSID · Canal · RSSI      │
+└──────────────────────────────────────────────────────┘
 ```
 
-### Flujo de operación
+### Flujo general del sistema
 
 ```
-Inicialización → Escaneo Wi-Fi → Procesamiento → Visualización TFT → Espera → (repite)
+  ┌─────────────┐
+  │ Inicializar │  SPI + TFT + Wi-Fi modo estación
+  └──────┬──────┘
+         │
+  ┌──────▼──────┐
+  │  Animación  │  Pantalla "Escaneando..."
+  └──────┬──────┘
+         │
+  ┌──────▼──────────┐
+  │ Escaneo Wi-Fi   │  WiFi.scanNetworks()
+  └──────┬──────────┘
+         │
+  ┌──────▼──────────────┐
+  │ Procesar resultados │  SSID · canal · RSSI · color
+  └──────┬──────────────┘
+         │
+  ┌──────▼──────────┐
+  │ Mostrar en TFT  │  Tabla + colores dinámicos
+  └──────┬──────────┘
+         │
+  ┌──────▼──────┐
+  │   Esperar   │  ~9.5 segundos
+  └──────┬──────┘
+         │
+         └──────────────────► (repite el ciclo)
 ```
 
-El ciclo se repite aproximadamente cada **9.5 segundos**, manteniendo la información actualizada sin sobrecargar el sistema.
+---
+
+## 🔄 Diagrama de secuencia
+
+Flujo de comunicación entre los componentes del sistema en cada ciclo:
+
+```
+   ESP32 (CPU)          Módulo Wi-Fi          Pantalla TFT
+       │                    │                     │
+       │── setup() ────────►│                     │
+       │   configura SPI ───────────────────────►│
+       │   muestra bienvenida ──────────────────►│
+       │                    │                     │
+       │── scanNetworks() ─►│                     │
+       │                    │── escanea redes ───►(espectro)
+       │◄── lista de redes ─│                     │
+       │                    │                     │
+       │── procesa datos ───┤                     │
+       │   (RSSI→color,     │                     │
+       │    corte de texto) │                     │
+       │                    │                     │
+       │── envía por SPI ───────────────────────►│
+       │                    │     muestra tabla   │
+       │                    │                     │
+       │── delay(9500ms) ───┤                     │
+       │                    │                     │
+       └── (repite loop) ───┘                     │
+```
 
 ---
 
@@ -66,167 +122,268 @@ El ciclo se repite aproximadamente cada **9.5 segundos**, manteniendo la informa
 
 ### Hardware
 
-| Componente | Función |
+| Componente | Descripción |
 |---|---|
-| **ESP32** | Microcontrolador principal. Procesamiento, Wi-Fi integrado |
-| **Pantalla TFT ILI9341** (2.4") | Visualización gráfica de los datos |
-| **Protocolo SPI** | Comunicación de alta velocidad entre ESP32 y pantalla |
+| **ESP32** | Microcontrolador principal con Wi-Fi integrado |
+| **Pantalla TFT ILI9341** (2.4") | Visualización gráfica en color |
+| **Protocolo SPI** | Comunicación de alta velocidad ESP32 ↔ TFT |
+| **Cables jumper + USB** | Conexión y programación |
 
 ### Software
 
-| Tecnología | Uso |
+| Librería / Herramienta | Uso |
 |---|---|
 | **Arduino IDE** | Entorno de desarrollo (C/C++) |
-| `WiFi.h` | Escaneo de redes y obtención de parámetros Wi-Fi |
+| `WiFi.h` | Escaneo de redes, SSID, canal, RSSI |
 | `SPI.h` | Comunicación con la pantalla TFT |
-| `Adafruit_GFX` | Motor gráfico base (texto, formas, colores) |
-| `Adafruit_ILI9341` | Driver específico para la pantalla ILI9341 |
-| `Serial` | Depuración y monitoreo durante desarrollo |
+| `Adafruit_GFX` | Motor gráfico: texto, formas, colores |
+| `Adafruit_ILI9341` | Driver específico para la pantalla |
+| `Serial` | Depuración por monitor serial |
 
 ---
 
-## 📁 Estructura de carpetas
+## 📁 Estructura del proyecto
 
 ```
 wifi-scanner/
 │
-├── wifi_scanner.ino        # Archivo principal del programa
+├── wifi_scanner.ino        # Punto de entrada — lógica principal del sistema
 │
-├─
-
+├── src/                    # Módulos separados para escalabilidad futura
+│   ├── display.h/.cpp      # Funciones de visualización TFT
+│   ├── scanner.h/.cpp      # Lógica de escaneo Wi-Fi
+│   └── utils.h/.cpp        # Funciones auxiliares (colores, texto)
+│
+├── lib/                    # Librerías externas fijadas por versión
+├── include/                # Archivos de cabecera globales
+│
+├── docs/                   # Documentación técnica y diagramas
+│   └── arquitectura.png
+│
+├── assets/                 # Capturas e imágenes del dispositivo físico
+│
 ├── README.md               # Este archivo
 ├── .gitignore
 └── LICENSE
 ```
 
+> **Funciones principales en `wifi_scanner.ino`:**  
+> `setup()` · `loop()` · `mostrarRedes()` · `pantallaEscaneandoAnimada()` · `pantallaBienvenida()` · `colorRSSI()` · `cortarTexto()`
+
 ---
 
-## ✅ Requisitos previos
+## ✅ Requisitos e instalación
+
+### Requisitos de hardware
 
 - [ ] Microcontrolador **ESP32**
 - [ ] Pantalla **TFT ILI9341** (2.4 pulgadas)
 - [ ] Cables de conexión (jumpers)
-- [ ] Cable USB para programación
-- [ ] Computadora con Windows, Linux o macOS
-- [ ] **Arduino IDE** instalado
+- [ ] Cable USB (micro o tipo-C según modelo de ESP32)
+
+### Requisitos de software
+
+- [ ] [Arduino IDE](https://www.arduino.cc/en/software) instalado
+- [ ] Soporte para placas ESP32 agregado al IDE
+- [ ] Librerías: `Adafruit GFX` y `Adafruit ILI9341`
 
 ---
 
-## 🚀 Instalación y configuración
+### Paso 1 — Agregar soporte ESP32 en Arduino IDE
 
-### 1. Agregar soporte para ESP32 en Arduino IDE
-
-En Arduino IDE ve a **Archivo → Preferencias** y agrega la siguiente URL en "Gestor de URLs adicionales de tarjetas":
+1. Abre Arduino IDE → **Archivo → Preferencias**
+2. En *"Gestor de URLs adicionales de tarjetas"*, pega:
 
 ```
 https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
 ```
 
-Luego ve a **Herramientas → Placa → Gestor de tarjetas**, busca `esp32` e instálalo.
-
-### 2. Instalar librerías
-
-Desde **Herramientas → Administrar bibliotecas**, busca e instala:
-
-- `Adafruit GFX Library`
-- `Adafruit ILI9341`
-
-> `WiFi.h` y `SPI.h` vienen incluidas con el soporte ESP32.
-
-### 3. Conectar el hardware
-
-Verifica que los pines definidos en el código coincidan con tu cableado físico:
-
-| Pin ESP32 | Pin TFT ILI9341 |
-|---|---|
-| MOSI | SDI/MOSI |
-| MISO | SDO/MISO |
-| SCK | SCK |
-| CS | CS |
-| DC | DC/RS |
-| RST | RESET |
-| 3.3V | VCC |
-| GND | GND |
-
-### 4. Cargar el programa
-
-1. Abre `wifi_scanner.ino` en Arduino IDE
-2. Selecciona la placa: **Herramientas → Placa → ESP32 Dev Module**
-3. Selecciona el puerto correspondiente
-4. Haz clic en **Subir** (→)
-
-El ESP32 se reiniciará automáticamente y comenzará el escaneo.
+3. Ve a **Herramientas → Placa → Gestor de tarjetas**
+4. Busca `esp32` e instala el paquete de **Espressif Systems**
 
 ---
 
-## 📲 Uso
+### Paso 2 — Instalar librerías
 
-Una vez encendido, el dispositivo opera de forma completamente automática:
+En **Herramientas → Administrar bibliotecas**, busca e instala:
 
-1. **Pantalla de bienvenida** — indica que el sistema está listo
-2. **Animación de escaneo** — muestra que el proceso está en curso
-3. **Lista de redes detectadas** — tabla con SSID, canal y RSSI
+```
+Adafruit GFX Library
+Adafruit ILI9341
+```
 
-La intensidad de señal se indica mediante colores:
+> `WiFi.h` y `SPI.h` vienen incluidas automáticamente con el soporte ESP32.
 
-| Color | Calidad de señal |
+---
+
+### Paso 3 — Conectar el hardware
+
+| Pin ESP32 | Pin TFT ILI9341 | Descripción |
+|---|---|---|
+| GPIO 23 | SDI / MOSI | Datos hacia la pantalla |
+| GPIO 19 | SDO / MISO | Datos desde la pantalla |
+| GPIO 18 | SCK | Reloj SPI |
+| GPIO 5 | CS | Chip Select |
+| GPIO 2 | DC / RS | Comando vs Datos |
+| GPIO 4 | RESET | Reset de pantalla |
+| 3.3V | VCC | Alimentación |
+| GND | GND | Tierra |
+
+> ⚠️ Verifica que los `#define` de pines en el código coincidan exactamente con tu cableado físico antes de cargar el programa.
+
+---
+
+### Paso 4 — Clonar y cargar el proyecto
+
+```bash
+# Clona el repositorio
+git clone https://github.com/tu-usuario/wifi-scanner.git
+
+# Abre el archivo principal en Arduino IDE:
+# Archivo → Abrir → wifi_scanner.ino
+```
+
+En Arduino IDE:
+
+1. **Herramientas → Placa** → selecciona `ESP32 Dev Module`
+2. **Herramientas → Puerto** → selecciona el puerto COM/USB del ESP32
+3. Haz clic en **Subir** (`→`)
+
+El ESP32 se reiniciará automáticamente y comenzará a escanear.
+
+---
+
+## 📲 Cómo usarlo
+
+Una vez cargado el programa, el dispositivo opera de forma **completamente automática**. No se necesita ingresar comandos ni interactuar con él.
+
+### Ciclo de operación
+
+| Etapa | Qué sucede en pantalla |
 |---|---|
-| 🟢 Verde | Fuerte |
-| 🟡 Amarillo | Media |
-| 🔴 Rojo | Débil |
+| **1. Encendido** | Pantalla de bienvenida con nombre del proyecto |
+| **2. Escaneo** | Animación de "Escaneando..." |
+| **3. Resultados** | Tabla con hasta 8 redes: SSID · Canal · RSSI |
+| **4. Actualización** | Ciclo se repite automáticamente cada ~9.5 s |
 
-La pantalla muestra hasta **8 redes simultáneamente** y se actualiza cada ~9.5 segundos.
+### Lectura de colores de señal
+
+| Color | Calidad RSSI | Interpretación |
+|---|---|---|
+| 🟢 **Verde** | Señal fuerte | Buena cobertura |
+| 🟡 **Amarillo** | Señal media | Cobertura aceptable |
+| 🔴 **Rojo** | Señal débil | Cobertura limitada |
 
 ### Monitoreo serial (opcional)
 
-Para ver información adicional, abre el **Monitor Serial** en Arduino IDE. Los datos de cada red también se imprimen ahí en formato texto, útil para depuración o análisis detallado.
+Para ver los datos en formato texto durante desarrollo:
+
+1. Conecta el ESP32 a la computadora por USB
+2. En Arduino IDE → **Herramientas → Monitor Serial**
+3. Configura la velocidad en **`115200 baudios`**
+
+Cada red detectada aparecerá con su SSID, canal y valor RSSI numérico.
+
+> Este proyecto **no requiere servidor**. Toda la lógica corre localmente en el ESP32, sin conexión a servicios externos.
 
 ---
 
-## 🧪 Pruebas
+## 🧪 Cómo correr tests
 
-Al tratarse de un sistema embebido, la validación se realiza de forma funcional:
+Al ser un sistema embebido, no se utilizan frameworks de testing automatizado. La validación se realiza mediante **verificación funcional directa** sobre el dispositivo.
 
-- [ ] El dispositivo enciende correctamente y muestra la pantalla de bienvenida
-- [ ] La animación de escaneo se despliega sin errores
-- [ ] Se detectan redes Wi-Fi reales del entorno
-- [ ] Los valores de RSSI y canal son coherentes
-- [ ] Los colores de señal se asignan correctamente
-- [ ] La información se actualiza de forma periódica y continua
+### Checklist de pruebas
 
-Se recomienda probar en distintos entornos (hogar, oficina, espacio público) para validar el comportamiento bajo diferentes condiciones de red.
-
----
-
-## 🤝 Contribuir
-
-¡Las contribuciones son bienvenidas! Sigue estos pasos:
-
-```bash
-# 1. Clona el repositorio
-git clone https://github.com/tu-usuario/wifi-scanner.git
-
-# 2. Crea una rama para tu feature o fix
-git checkout -b feature/nueva-funcionalidad
-
-# 3. Realiza tus cambios y haz commit
-git commit -m "feat: descripción del cambio"
-
-# 4. Sube tu rama
-git push origin feature/nueva-funcionalidad
-
-# 5. Abre un Pull Request
+```
+[ ] El dispositivo enciende y muestra la pantalla de bienvenida
+[ ] La animación de escaneo se despliega sin errores
+[ ] Se detectan redes Wi-Fi reales del entorno
+[ ] Los valores de canal son números entre 1 y 13
+[ ] Los valores de RSSI son negativos (ej: -45, -72, -88)
+[ ] Los colores corresponden correctamente a la intensidad de señal
+[ ] Los SSIDs largos se cortan sin desbordarse en pantalla
+[ ] La información se actualiza periódicamente sin congelarse
+[ ] El monitor serial imprime los datos en paralelo
 ```
 
-### Áreas donde puedes contribuir
+### Entornos de prueba recomendados
 
-- ⚡ Optimización del rendimiento del escaneo
-- 🎨 Mejoras en la interfaz gráfica TFT
-- 💾 Integración con almacenamiento de datos (SD card)
-- ☁️ Conexión a plataformas en la nube (MQTT, HTTP)
-- 📊 Nuevas métricas de análisis (densidad de canales, historial)
+| Entorno | Qué se valida |
+|---|---|
+| **Hogar** | Pocas redes, señal fuerte, comportamiento base |
+| **Oficina** | Múltiples redes, mayor densidad de dispositivos |
+| **Espacio público** | Alta densidad de redes, posible congestión de canales |
 
-Por favor, mantén el código limpio, documentado y respeta la estructura del proyecto.
+---
+
+## ❓ FAQ — Dudas frecuentes
+
+**¿El dispositivo necesita conexión a internet?**  
+No. Opera completamente offline. Solo escanea redes cercanas sin conectarse a ninguna.
+
+**¿Puede hackear o acceder a las redes que detecta?**  
+No. Solo lee información que las redes transmiten públicamente (SSID, canal, potencia de señal). No intercepta tráfico ni realiza ningún ataque.
+
+**¿Cuántas redes puede mostrar a la vez?**  
+Hasta 8 redes simultáneamente. Si hay más en el entorno, se muestran las primeras detectadas.
+
+**¿Por qué no aparece ninguna red?**  
+Verifica que el ESP32 esté configurado en modo `WIFI_STA` y que la conexión SPI con la pantalla sea correcta. También revisa que no haya interferencia metálica cerca de la antena.
+
+**¿Puedo cambiar el intervalo de actualización?**  
+Sí. En el código, modifica el valor del `delay()` al final de `loop()`. Está configurado en `9500` (milisegundos = 9.5 segundos).
+
+**¿Funciona con otras pantallas TFT?**  
+El código usa el driver `ILI9341`. Usar otra pantalla requiere cambiar la librería y posiblemente ajustar los pines y resolución.
+
+**¿El proyecto necesita servidor o base de datos?**  
+No en su versión actual. A futuro podría expandirse para enviar datos a un servidor MQTT o plataforma en la nube.
+
+---
+
+## 🤝 Cómo contribuir
+
+Este proyecto es open source. Sigue este flujo estándar para colaborar:
+
+```bash
+# 1. Haz fork del repositorio en GitHub
+
+# 2. Clona tu fork
+git clone https://github.com/tu-usuario/wifi-scanner.git
+cd wifi-scanner
+
+# 3. Crea una rama para tu cambio
+git checkout -b feature/nombre-de-tu-mejora
+
+# 4. Realiza tus cambios y documenta el código
+
+# 5. Haz commit descriptivo
+git add .
+git commit -m "feat: descripción clara del cambio"
+
+# 6. Sube tu rama
+git push origin feature/nombre-de-tu-mejora
+
+# 7. Abre un Pull Request en GitHub
+```
+
+### Buenas prácticas
+
+- Mantén el código limpio y comentado
+- Respeta la estructura de carpetas del proyecto
+- Prueba los cambios en el hardware antes de abrir el PR
+- No modifiques funcionalidades existentes sin documentarlo en el PR
+
+### Áreas abiertas para contribución
+
+| Área | Descripción |
+|---|---|
+| ⚡ Rendimiento | Optimizar velocidad de escaneo |
+| 🎨 Interfaz | Mejorar diseño visual en la pantalla TFT |
+| 💾 Almacenamiento | Guardar historial en tarjeta SD |
+| ☁️ Nube | Envío de datos vía MQTT o HTTP |
+| 📊 Métricas | Historial de señal, densidad por canal |
+| 🌐 Idiomas | Soporte multilenguaje en la interfaz |
 
 ---
 
